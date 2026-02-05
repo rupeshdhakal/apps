@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stream Player</title>
+
+  <script src="https://ssl.p.jwpcdn.com/player/v/8.36.0/jwplayer.js"></script>
+  <script>
+    jwplayer.key = "XSuP4qMl+9tK17QNb+4+th2Pm9AWgMO/cYH8CI0HGGr7bdjo";
+  </script>
+
+  <style>
+    body {
+      margin: 0;
+      color: #e5e7eb;
+      font-family: Arial, sans-serif;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 30px auto;
+      padding: 20px;
+    }
+
+    #player {
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, .4);
+      background: #000;
+      margin-top: 20px;
+    }
+
+    .form {
+      padding: 16px;
+      border-radius: 10px;
+    }
+
+    .form input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 12px;
+      border-radius: 2px;
+      border: none;
+      outline: none;
+      color: #e5e7eb;
+      border: 1px solid #334155;
+    }
+
+    .form button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .form button:hover {
+      background: #1d4ed8;
+    }
+
+    .error {
+      text-align: center;
+      color: #ef4444;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+
+    <div class="form">
+      <input id="hls" placeholder="HLS URL" />
+      <input id="dash" placeholder="DASH URL" />
+      <input id="key" placeholder="ClearKey" />
+      <button onclick="loadStream()">Play Stream</button>
+      <div id="error" class="error"></div>
+    </div>
+
+    <div id="player"></div>
+
+  </div>
+
+  <script>
+    let player = jwplayer("player");
+
+    function showError(msg) {
+      document.getElementById("error").innerText = msg;
+    }
+
+    function loadStream() {
+      showError("");
+
+      const hls = document.getElementById("hls").value.trim();
+      const dash = document.getElementById("dash").value.trim();
+      const keyParam = document.getElementById("key").value.trim();
+
+      let source = null;
+
+      if (hls) {
+        source = {
+          file: hls,
+          type: "hls"
+        };
+      }
+      else if (dash) {
+        if (!keyParam || !keyParam.includes(":")) {
+          showError("Invalid ClearKey format. Use kid:key");
+          return;
+        }
+
+        const [kid, key] = keyParam.split(":");
+
+        source = {
+          file: dash,
+          type: "dash",
+          drm: {
+            clearkey: {
+              keyId: kid.trim(),
+              key: key.trim()
+            }
+          }
+        };
+      }
+      else {
+        showError("Please enter HLS or DASH URL");
+        return;
+      }
+
+      player.setup({
+        playlist: [{
+          sources: [source]
+        }],
+        width: "100%",
+        aspectratio: "16:9",
+        autostart: true
+      });
+    }
+  </script>
+
+</body>
+
+</html>
