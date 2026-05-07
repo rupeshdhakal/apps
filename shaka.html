@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shaka Stream Player</title>
+
+    <!-- Shaka Player UI Styles & Scripts -->
+    <link rel="stylesheet" href="https://unpkg.com/shaka-player/dist/controls.css">
+    <script src="https://unpkg.com/shaka-player/dist/shaka-player.compiled.js"></script>
+    <script src="https://unpkg.com/shaka-player/dist/shaka-player.ui.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            font-family: "Roboto", sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        .form {
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+       
+            margin-bottom: 20px;
+        }
+
+        .form input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            outline: none;
+            border: 1px solid #cbd5e1;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        .form button {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            background: #2563eb;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .form button:hover {
+            background: #1d4ed8;
+        }
+
+        .video-container {
+            width: 100%;
+            background-color: black;
+            border-radius: 0px;
+            overflow: hidden;
+        }
+
+        video {
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+    <!-- Input UI -->
+    <div class="form">
+        <input id="hls" placeholder="HLS URL (.m3u8)" />
+        <input id="dash" placeholder="DASH URL (.mpd)" />
+        <input id="key" placeholder="ClearKey (hex_key_id:hex_key)" />
+        <button id="playBtn">Play Stream</button>
+    </div>
+
+    <!-- Player UI -->
+    <div class="video-container" data-shaka-player-container>
+        <video data-shaka-player id="video" autoplay></video>
+    </div>
+
+</div>
+
+<script>
+    let player;
+    let ui;
+
+    async function initApp() {
+        const video = document.getElementById('video');
+        const uiContainer = document.querySelector('.video-container');
+        
+        // Initialize Shaka UI and Player
+        ui = video['ui'];
+        player = ui.getControls().getPlayer();
+
+        // Configure UI
+        ui.configure({
+            controlPanelElements: ['play_pause', 'mute', 'time_and_duration', 'spacer', 'overflow_menu', 'picture_in_picture', 'fullscreen'],
+            overflowMenuButtons: ['quality', 'language', 'playback_rate', 'statistics']
+        });
+
+        // Global Error listener
+        player.addEventListener('error', (event) => {
+            console.error('Error code', event.detail.code, event.detail);
+            alert("Error playing stream: " + event.detail.code);
+        });
+
+        document.getElementById('playBtn').addEventListener('click', playStream);
+    }
+
+    async function playStream() {
+        const hlsUrl = document.getElementById('hls').value.trim();
+        const dashUrl = document.getElementById('dash').value.trim();
+        const clearKeyInput = document.getElementById('key').value.trim();
+
+        // 1. Validation: Both filled
+        if (hlsUrl && dashUrl) {
+            alert("Only one URL can be filled (HLS or DASH)");
+            return;
+        }
+
+        // 2. Validation: ClearKey usage
+        if (clearKeyInput && !dashUrl) {
+            alert("ClearKey can only be used with a DASH (MPD) URL");
+            return;
+        }
+
+        const streamUrl = hlsUrl || dashUrl;
+        if (!streamUrl) {
+            alert("Please enter a stream URL");
+            return;
+        }
+
+        // Reset configuration before loading new stream
+        player.configure({ drm: { clearKeys: {} } });
+
+        // 3. Apply ClearKey if provided
+        if (dashUrl && clearKeyInput) {
+            const parts = clearKeyInput.split(':');
+            if (parts.length === 2) {
+                const keyId = parts[0];
+                const key = parts[1];
+                
+                player.configure({
+                    drm: {
+                        clearKeys: {
+                            [keyId]: key
+                        }
+                    }
+                });
+            } else {
+                alert("Invalid ClearKey format. Use keyid:key");
+                return;
+            }
+        }
+
+        try {
+            await player.load(streamUrl);
+            console.log('Stream loaded successfully');
+        } catch (e) {
+            console.error('Load failed', e);
+        }
+    }
+
+    // Initialize when Shaka is ready
+    document.addEventListener('shaka-ui-loaded', initApp);
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.shaka && window.shaka.ui) initApp();
+    });
+</script>
+</body>
+</html>
