@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Merged Stream Player</title>
+
+    <!-- Shaka Player UI Styles & Scripts -->
+    <link rel="stylesheet" href="https://unpkg.com/shaka-player/dist/controls.css">
+    <script src="https://unpkg.com/shaka-player/dist/shaka-player.compiled.js"></script>
+    <script src="https://unpkg.com/shaka-player/dist/shaka-player.ui.js"></script>
+
+    <!-- JW Player Script -->
+    <script src="https://ssl.p.jwpcdn.com/player/v/8.36.0/jwplayer.js"></script>
+    <script>
+        jwplayer.key = "XSuP4qMl+9tK17QNb+4+th2Pm9AWgMO/cYH8CI0HGGr7bdjo";
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            font-family: "Roboto", sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        .form {
+            padding: 20px;
+            background: white;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .form input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 5px;
+            outline: none;
+            border: 1px solid #cbd5e1;
+            box-sizing: border-box;
+            font-size: 13px;
+            color: black;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        .form button {
+            width: 100%;
+            padding: 12px;
+            border-radius: 5px;
+            border: none;
+            background: #2563eb;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .form button:hover {
+            background: #1d4ed8;
+        }
+
+        .video-container {
+            width: 100%;
+            background-color: black;
+            border-radius: 0px;
+            overflow: hidden;
+            display: none;
+        }
+
+        video {
+            width: 100%;
+        }
+
+        #jwplayer-wrapper {
+            margin-top: 20px;
+            display: none;
+        }
+
+        #jwplayer-target {
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .4);
+            background: #000;
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+    <!-- Input UI -->
+    <div class="form">
+        <input id="hls" placeholder="HLS URL" />
+        <input id="dash" placeholder="DASH URL" />
+        <input id="key" placeholder="ClearKey" />
+        <div class="btn-group">
+            <button id="playShakaBtn">Play on Shaka Player</button>
+            <button id="playJwBtn">Play on JW Player</button>
+        </div>
+    </div>
+
+    <!-- Shaka Player Container Target -->
+    <div class="video-container" id="shaka-container" data-shaka-player-container>
+        <video data-shaka-player id="video" autoplay></video>
+    </div>
+
+    <!-- JW Player Wrapper Target -->
+    <div id="jwplayer-wrapper">
+        <div id="jwplayer-target"></div>
+    </div>
+
+</div>
+
+<script>
+    let shakaPlayerInstance;
+    let shakaUiInstance;
+    let jwPlayerInstance = null;
+
+    function stopAllPlayers() {
+        if (shakaPlayerInstance) {
+            try { shakaPlayerInstance.unload(); } catch(e){}
+        }
+        if (jwPlayerInstance) {
+            try { 
+                jwPlayerInstance.remove(); 
+                jwPlayerInstance = null;
+            } catch(e){}
+        }
+        
+        // Fully reset target DOM element for JW Player to override script locks
+        document.getElementById('jwplayer-wrapper').innerHTML = '<div id="jwplayer-target"></div>';
+
+        document.getElementById('shaka-container').style.display = 'none';
+        document.getElementById('jwplayer-wrapper').style.display = 'none';
+    }
+
+    // --- SHAKA PLAYER LOGIC ---
+    async function initShaka() {
+        const video = document.getElementById('video');
+        shakaUiInstance = video['ui'];
+        shakaPlayerInstance = shakaUiInstance.getControls().getPlayer();
+
+        shakaUiInstance.configure({
+            controlPanelElements: ['play_pause', 'mute', 'time_and_duration', 'spacer', 'overflow_menu', 'picture_in_picture', 'fullscreen'],
+            overflowMenuButtons: ['quality', 'language', 'playback_rate', 'statistics']
+        });
+    }
+
+    async function playOnShaka() {
+        stopAllPlayers();
+
+        const hlsUrl = document.getElementById('hls').value.trim();
+        const dashUrl = document.getElementById('dash').value.trim();
+        const clearKeyInput = document.getElementById('key').value.trim();
+        const streamUrl = hlsUrl || dashUrl;
+
+        if (!streamUrl) return;
+
+        document.getElementById('shaka-container').style.display = 'block';
+
+        if (!shakaPlayerInstance) {
+            await initShaka();
+        }
+
+        shakaPlayerInstance.configure({ drm: { clearKeys: {} } });
+
+        if (dashUrl && clearKeyInput && clearKeyInput.includes(':')) {
+            const parts = clearKeyInput.split(':');
+            shakaPlayerInstance.configure({
+                drm: {
+                    clearKeys: {
+                        [parts[0].trim()]: parts[1].trim()
+                    }
+                }
+            });
+        }
+
+        try {
+            await shakaPlayerInstance.load(streamUrl);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // --- JW PLAYER LOGIC ---
+    function playOnJw() {
+        stopAllPlayers();
+
+        const hls = document.getElementById("hls").value.trim();
+        const dash = document.getElementById("dash").value.trim();
+        const keyParam = document.getElementById("key").value.trim();
+        const streamUrl = hls || dash;
+
+        if (!streamUrl) return;
+
+        let source = null;
+
+        if (hls) {
+            source = { file: hls, type: "hls" };
+        } else if (dash) {
+            source = { file: dash, type: "dash" };
+            if (keyParam && keyParam.includes(":")) {
+                const [kid, key] = keyParam.split(":");
+                source.drm = {
+                    clearkey: {
+                        keyid: kid.trim(),
+                        key: key.trim()
+                    }
+                };
+            }
+        }
+
+        document.getElementById('jwplayer-wrapper').style.display = 'block';
+        
+        jwPlayerInstance = jwplayer("jwplayer-target");
+        jwPlayerInstance.setup({
+            playlist: [{
+                sources: [source]
+            }],
+            width: "100%",
+            aspectratio: "16:9",
+            autostart: true
+        });
+    }
+
+    document.getElementById('playShakaBtn').addEventListener('click', playOnShaka);
+    document.getElementById('playJwBtn').addEventListener('click', playOnJw);
+
+    document.addEventListener('shaka-ui-loaded', () => {
+        const video = document.getElementById('video');
+        if (video && video['ui']) initShaka();
+    });
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.shaka && window.shaka.ui && document.getElementById('video')['ui']) initShaka();
+    });
+</script>
+</body>
+</html>
