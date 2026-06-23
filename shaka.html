@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Shaka Stream Player</title>
+    <title>Shaka Player</title>
 
     <!-- Shaka Player UI Styles & Scripts -->
     <link rel="stylesheet" href="https://unpkg.com/shaka-player/dist/controls.css">
@@ -112,6 +112,13 @@
             overflowMenuButtons: ['quality', 'language', 'playback_rate', 'statistics']
         });
 
+        // --- ADDED NATIVE HLS PREFERENCE HERE ---
+        player.configure({
+            streaming: {
+                preferNativeHls: true
+            }
+        });
+
         // Global Error listener
         player.addEventListener('error', (event) => {
             console.error('Error code', event.detail.code, event.detail);
@@ -144,7 +151,8 @@
             return;
         }
 
-        // Reset configuration before loading new stream
+        // Reset configuration before loading new stream 
+        // (Note: This retains the streaming config set in initApp unless explicitly overwritten here)
         player.configure({ drm: { clearKeys: {} } });
 
         // 3. Apply ClearKey if provided
